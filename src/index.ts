@@ -25,8 +25,26 @@ export interface Env {
 	// MY_QUEUE: Queue;
 }
 
+class ScriptContentReader {
+	tagContents: string = "";
+	text(text: Text) {
+		this.tagContents = this.tagContents + text.text;
+	}
+}
+
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		return new Response('Hello World!');
+		const pathName = new URL(request.url).pathname;
+		if (pathName != '/') {
+			return new Response("", {status: 404})
+		}
+		const res = await fetch("https://osu.ppy.sh/home/changelog");
+		const scriptContentReader = new ScriptContentReader();
+		await new HTMLRewriter().on('script#json-index', scriptContentReader).transform(res).text();
+		const parsed = JSON.parse(scriptContentReader.tagContents);
+
+		// todo: do something with parsed json here
+
+		return new Response(JSON.stringify(parsed));
 	},
 };
