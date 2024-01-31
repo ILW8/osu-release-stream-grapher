@@ -8,23 +8,6 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
-export interface Env {
-	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
-	// MY_KV_NAMESPACE: KVNamespace;
-	//
-	// Example binding to Durable Object. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-	// MY_DURABLE_OBJECT: DurableObjectNamespace;
-	//
-	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
-	// MY_BUCKET: R2Bucket;
-	//
-	// Example binding to a Service. Learn more at https://developers.cloudflare.com/workers/runtime-apis/service-bindings/
-	// MY_SERVICE: Fetcher;
-	//
-	// Example binding to a Queue. Learn more at https://developers.cloudflare.com/queues/javascript-apis/
-	// MY_QUEUE: Queue;
-}
-
 class ScriptContentReader {
 	tagContents: string = "";
 	text(text: Text) {
@@ -32,19 +15,88 @@ class ScriptContentReader {
 	}
 }
 
+interface BuildHistory { label: "Web" | "Stable" | "Beta" | "Cutting Edge" | "Lazer", user_count: number, created_at: string }
+
+interface JsonChartConfig {
+	build_history: [BuildHistory];
+	order: [string];
+}
+
+interface ThingDataset { label: string, data: [number?], borderWidth?: number, fill?: boolean }
+
 export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+	async fetch(request: Request): Promise<Response> {
 		const pathName = new URL(request.url).pathname;
 		if (pathName != '/') {
 			return new Response("", {status: 404})
 		}
 		const res = await fetch("https://osu.ppy.sh/home/changelog");
 		const scriptContentReader = new ScriptContentReader();
-		await new HTMLRewriter().on('script#json-index', scriptContentReader).transform(res).text();
-		const parsed = JSON.parse(scriptContentReader.tagContents);
+		await new HTMLRewriter().on('script#json-chart-config', scriptContentReader).transform(res).text();
 
-		// todo: do something with parsed json here
+		const parsed: JsonChartConfig = JSON.parse(scriptContentReader.tagContents);
 
-		return new Response(JSON.stringify(parsed));
+		let a: {
+			Beta: ThingDataset,
+			Lazer: ThingDataset,
+			Stable: ThingDataset,
+			"Cutting Edge": ThingDataset} = {
+			"Lazer": {label: "Lazer", data: [], fill: true},
+			"Stable": {label: "Stable", data: [], fill: true},
+			"Beta": {label: "Beta", data: [], fill: true},
+			"Cutting Edge": {label: "Cutting Edge", data: [], fill: true},
+		};
+		let labels: string[] = [];
+		for (const buildHistoryElement of parsed.build_history) {
+			switch (buildHistoryElement.label) {
+				case "Web":
+					break;
+				default:
+					if (labels[labels.length - 1] != buildHistoryElement.created_at) {
+						labels.push(buildHistoryElement.created_at);
+					}
+					a[buildHistoryElement.label].data.push(buildHistoryElement.user_count)
+					break;
+			}
+		}
+
+		const html = `
+<!DOCTYPE html>
+<head>
+	<title>727</title>
+</head>
+<body>
+	<div>
+		<canvas id="myChart"></canvas>
+	</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<script>
+		const ctx = document.getElementById('myChart');
+
+		new Chart(ctx, {
+			type: 'line',
+			data: {
+				labels: ${JSON.stringify(labels)},
+				datasets: ${JSON.stringify(Object.values(a))}
+			},
+			options: {
+				scales: {
+					y: {
+						stacked: true,
+						beginAtZero: true
+					}
+				}
+			}
+		});
+	</script>
+</body>
+`;
+
+		return new Response(html, {
+			headers: {
+				"content-type": "text/html;charset=UTF-8",
+			},
+		});
 	},
 };
