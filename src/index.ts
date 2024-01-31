@@ -22,7 +22,7 @@ interface JsonChartConfig {
 	order: [string];
 }
 
-interface ThingDataset { label: string, data: [number?], borderWidth?: number, fill?: boolean }
+interface ThingDataset { label: string, data: [number?] }
 
 export default {
 	async fetch(request: Request): Promise<Response> {
@@ -41,10 +41,10 @@ export default {
 			Lazer: ThingDataset,
 			Stable: ThingDataset,
 			"Cutting Edge": ThingDataset} = {
-			"Lazer": {label: "Lazer", data: [], fill: true},
-			"Stable": {label: "Stable", data: [], fill: true},
-			"Beta": {label: "Beta", data: [], fill: true},
-			"Cutting Edge": {label: "Cutting Edge", data: [], fill: true},
+			"Lazer": {label: "Lazer", data: []},
+			"Stable": {label: "Stable", data: []},
+			"Beta": {label: "Beta", data: []},
+			"Cutting Edge": {label: "Cutting Edge", data: []},
 		};
 		let labels: string[] = [];
 		for (const buildHistoryElement of parsed.build_history) {
@@ -81,6 +81,15 @@ export default {
 				datasets: ${JSON.stringify(Object.values(a))}
 			},
 			options: {
+				elements: {
+					point: {
+						pointStyle: false
+					},
+					line: {
+						fill: true,
+						cubicInterpolationMode: 'monotone'
+					}
+				},
 				scales: {
 					y: {
 						stacked: true,
