@@ -9,58 +9,38 @@
  */
 
 class ScriptContentReader {
-	tagContents: string = "";
+	tagContents: string = '';
+
 	text(text: Text) {
 		this.tagContents = this.tagContents + text.text;
 	}
 }
 
-interface BuildHistory { label: "Web" | "Stable" | "Beta" | "Cutting Edge" | "Lazer", user_count: number, created_at: string }
+interface BuildHistory {
+	label: 'Web' | 'Stable' | 'Beta' | 'Cutting Edge' | 'Lazer',
+	user_count: number,
+	created_at: string
+}
 
 interface JsonChartConfig {
 	build_history: [BuildHistory];
 	order: [string];
 }
 
-interface ThingDataset { label: string, data: [number?] }
+interface ThingDataset {
+	label: string,
+	data: [number?]
+}
 
-export default {
-	async fetch(request: Request): Promise<Response> {
-		const pathName = new URL(request.url).pathname;
-		if (pathName != '/') {
-			return new Response("", {status: 404})
-		}
-		const res = await fetch("https://osu.ppy.sh/home/changelog");
-		const scriptContentReader = new ScriptContentReader();
-		await new HTMLRewriter().on('script#json-chart-config', scriptContentReader).transform(res).text();
+interface Things {
+	'Beta': ThingDataset,
+	'Lazer': ThingDataset,
+	'Stable': ThingDataset,
+	'Cutting Edge': ThingDataset
+}
 
-		const parsed: JsonChartConfig = JSON.parse(scriptContentReader.tagContents);
-
-		let a: {
-			Beta: ThingDataset,
-			Lazer: ThingDataset,
-			Stable: ThingDataset,
-			"Cutting Edge": ThingDataset} = {
-			"Lazer": {label: "Lazer", data: []},
-			"Stable": {label: "Stable", data: []},
-			"Beta": {label: "Beta", data: []},
-			"Cutting Edge": {label: "Cutting Edge", data: []},
-		};
-		let labels: string[] = [];
-		for (const buildHistoryElement of parsed.build_history) {
-			switch (buildHistoryElement.label) {
-				case "Web":
-					break;
-				default:
-					if (labels[labels.length - 1] != buildHistoryElement.created_at) {
-						labels.push(buildHistoryElement.created_at);
-					}
-					a[buildHistoryElement.label].data.push(buildHistoryElement.user_count)
-					break;
-			}
-		}
-
-		const html = `
+function getHtmlForData(labels: string[], a: Things) {
+	return `
 <!DOCTYPE html>
 <head>
 	<title>727</title>
@@ -101,11 +81,44 @@ export default {
 	</script>
 </body>
 `;
+}
 
-		return new Response(html, {
+export default {
+	async fetch(request: Request): Promise<Response> {
+		const pathName = new URL(request.url).pathname;
+		if (pathName != '/') {
+			return new Response('', { status: 404 });
+		}
+		const res = await fetch('https://osu.ppy.sh/home/changelog');
+		const scriptContentReader = new ScriptContentReader();
+		await new HTMLRewriter().on('script#json-chart-config', scriptContentReader).transform(res).text();
+
+		const parsed: JsonChartConfig = JSON.parse(scriptContentReader.tagContents);
+
+		let a: Things = {
+			'Lazer': { label: 'Lazer', data: [] },
+			'Stable': { label: 'Stable', data: [] },
+			'Beta': { label: 'Beta', data: [] },
+			'Cutting Edge': { label: 'Cutting Edge', data: [] }
+		};
+		let labels: string[] = [];
+		for (const buildHistoryElement of parsed.build_history) {
+			switch (buildHistoryElement.label) {
+				case 'Web':
+					break;
+				default:
+					if (labels[labels.length - 1] != buildHistoryElement.created_at) {
+						labels.push(buildHistoryElement.created_at);
+					}
+					a[buildHistoryElement.label].data.push(buildHistoryElement.user_count);
+					break;
+			}
+		}
+
+		return new Response(getHtmlForData(labels, a), {
 			headers: {
-				"content-type": "text/html;charset=UTF-8",
-			},
+				'content-type': 'text/html;charset=UTF-8'
+			}
 		});
-	},
+	}
 };
